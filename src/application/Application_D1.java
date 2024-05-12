@@ -82,7 +82,6 @@ public class Application_D1 implements Runnable {
         // );
         // System.out.println(sb.insert(0, "Kunden, Namen alphabetisch sortiert:\n").toString());
 
-
         // /*
         //  * Print the three most expensive articles.
         //  */
@@ -90,7 +89,7 @@ public class Application_D1 implements Runnable {
         //     .sorted((a1, a2) -> Long.compare(a2.getUnitPrice(), a1.getUnitPrice()))
         //     .limit(3)
         // );
-        System.out.println(sb.insert(0, "Top 3 teuerste Artikel:\n").toString());
+        // System.out.println(sb.insert(0, "Top 3 teuerste Artikel:\n").toString());
     }
 
     /**
