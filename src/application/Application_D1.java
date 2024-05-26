@@ -278,7 +278,7 @@ public class Application_D1 implements Runnable {
         //
         final TableFormatter tf = new TableFormatter(
                 // column specification
-                "| %8s ", "| %-32s", "| %-36s |"
+                "| %8s ", "| %-27s", "| %-36s |"
             )
             .line()
             .row("Kund.-ID", "Name", "Kontakt")  // table header
@@ -306,7 +306,7 @@ public class Application_D1 implements Runnable {
         //
         final TableFormatter tf = new TableFormatter(
                 // column specification
-                "|%-10s", "| %-32s", "| %10s", "%4s", "|  %-18s  |"
+                "|%-10s", "| %-27s", "| %10s", "%4s", "|  %-18s  |"
             )
             .line()
             .row("Artikel-ID", "Beschreibung", "Preis", "CUR", "Mehrwertsteuersatz")  // table header
@@ -338,7 +338,7 @@ public class Application_D1 implements Runnable {
 
         final var tf = new TableFormatter(
                 // column specification
-                "|%-10s|", " %-25s", " %8s", "%1s", " %12s", "| %8s", " %12s|"
+                "|%-10s|", " %-20s", " %8s", "%1s", " %12s", "| %8s", " %12s|"
             )
             .line() // table header
             .row("Bestell-ID", "Bestellungen", "MwSt", "*", "Preis", "MwSt", "Gesamt")
