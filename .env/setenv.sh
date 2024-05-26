@@ -64,18 +64,20 @@ function setup() {
         echo "need to get all ${P[env]} files from repository: ${P[url]}" \
         return
 
-    # if 'libs' directory is not in project, attempt to wire it from an
+    # if 'libs' directory is not in the project, attempt to link it from an
     # alternative path, e.g. where the 'libs'-branch might be checked out
     local lib_paths=(
-        "branches/libs/libs" "branches/libs"
-        "../libs/libs" "../../libs/libs" "../../../libs/libs"
-        "../libs" "../../libs" "../../../libs"
+        "./libs/libs" "../libs/libs" "../../libs/libs" "../../../libs/libs"
+                "../../../../libs/libs"
+        "branches/libs/libs" "../branches/libs/libs" "../../branches/libs/libs"
+                "../../../branches/libs/libs" "../../../../branches/libs/libs"
+        "../libs" "../../libs" "../../../libs" "../../../../libs"
     )
     for lpath in "${lib_paths[@]}"; do
-        [ ! -d ${P[lib]} ] && local libs_linked=$(wire_links $lpath ${P[lib]})
+        [ ! -d ${P[lib]} ] && local libs_linked=$(wire_link $lpath ${P[lib]})
     done
-    # always adjust P[lib] for symlink (javac does not understand links)
-    [ -L libs ] && P[lib]=$(readlink libs)
+    # adjust P[lib] for symlink (javac does not understand links)
+    [ -L libs ] && P[lib]=$(trace_link libs)
 
     # define local variables and fill with values
     local module_dirs=( $(find ${P[lib]}/* -type d 2>/dev/null) )
@@ -347,19 +349,39 @@ function make() {
 }
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-# Attempt to link ("wire") a directory in the project directory (e.g. libs)
-# from an alternative path.
+# Attempt to link a directory from a destination (e.g. libs -> ../libs/libs).
 # GitBash understands links, but does not create links (copies files instead).
 # Usage:
-#   wire_links [alt_path] [link_name]
-# @param alt_path link destination path
-# @param link_name name of link
-function wire_links() {
-    local alt_path="$1"
+#   wire_link [src_path] [link_name]
+# @param src_path origination path (as directory, not link itself)
+# @param link_name name of created link
+function wire_link() {
+    local src_path=$(trace_link "$1")
     local link_name="$2"
-    [ ! -d $link_name -a ! -L $link_name -a -d $alt_path ] && \
-        ln -s $alt_path $link_name && \
+    [ ! -d $link_name -a ! -L $link_name -a -d $src_path ] && \
+        ln -s $src_path $link_name && \
             [ -L $link_name ] && echo " ln -s $(readlink $link_name) $link_name"
+}
+
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+# Trace link sequence (links pointing to links) to final file or directory.
+# Usage:
+#   trace_link [link]
+# @param link starting point of tracing
+# @output path to final directory or link
+function trace_link() {
+    local link=$1
+    local trace=""
+    while [ -L "$link" ]; do
+        link=$(readlink $link)
+        if [ -z "$trace" ]; then
+            trace=$link
+        else
+            trace=$(dirname $trace)
+            trace+="/"$link
+        fi
+    done
+    echo $([ -z "$trace" ] && echo $link || echo $trace)
 }
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -464,12 +486,13 @@ function coverage_report() {
         else
             local output="--html ${P[cov]}"
             case "$1" in
-            csv) output="--csv ${P[cov]}/coverage.csv" ;;
-            xml) output="--xml ${P[cov]}/coverage.xml" ;;
+            csv|.csv) output="--csv ${P[cov]}/coverage.csv" ;;
+            xml|.xml) output="--xml ${P[cov]}/coverage.xml" ;;
             esac
             local reporter=$(echo -n $CLASSPATH | tr "[;:]" "\n" | grep jacococli.jar);
-            java -jar "${reporter}" report ${P[cov]}/jacoco.exec \
-                --sourcefiles ${P[src]} $output ${analyze_classes[@]}
+            # zsh need eval() funtion to execute java
+            $(eval echo java -jar $reporter report ${P[cov]}/jacoco.exec \
+                --sourcefiles ${P[src]} $output ${analyze_classes[@]})
         fi
     fi
 }
@@ -479,4 +502,4 @@ function coverage_report() {
 setup
 
 # remove transient varibales and functions from shell-process
-unset -f setup wire_links eclipse_classpath
+unset -f setup wire_link trace_link eclipse_classpath
