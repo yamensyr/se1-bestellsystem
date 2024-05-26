@@ -18,8 +18,9 @@ The data model is (UML Class Diagram, see also StarUML-file:
 
 Content:
 
-- [Setup](#1-setup)
-    - Fetching the Code-drop
+- [Setup](#1-setup) - Fetching Branches and Sourcing the Project
+    - branch: [C12-Customer](https://github.com/sgra64/se1.bestellsystem/tree/C12-Customer),
+    - branch: [D12-Datamodel](https://github.com/sgra64/se1.bestellsystem/tree/D12-Datamodel).
 
 - [D1: Completing the Datamodel](#d1-completing-the-datamodel)
     - Datamodel Generation and Completion
@@ -35,19 +36,20 @@ Content:
     - order value and tax calculations (steps 6-9)
 
 
-- [Release Preparation](#4-release-preparation)
+- [Release Preparation](#release-preparation)
     - Packaging the Application
     - Running the packaged Application
 
 
 &nbsp;
+
 ## 1. Setup
 
 Merge files from the distribution branch
 [D12-Datamodel](https://github.com/sgra64/se1.bestellsystem/tree/D12-Datamodel)
 into project `se1.bestellsystem`.
 
-Setup assumes the project is under `git` control. Initialize for `git`
+Setup assumes the project is under `git` control. Initialize `git`
 if this is not yet the case (skip step: `git init` otherwise).
 
 ```sh
@@ -99,18 +101,37 @@ tests/datamodel/Order_300_CreationDate_Tests.java
 tests/datamodel/Order_400_OrderItems_Tests.java
 ```
 
-If e.g. Customer-tests are missing, merge tests from branch
-[C12-Customer](https://github.com/sgra64/se1.bestellsystem/tree/C12-Customer):
+Customer-tests from branch
+[C12-Customer](https://github.com/sgra64/se1.bestellsystem/tree/C12-Customer)
+might be missing. Obtain them from the branch:
 
 ```sh
-# fetch branch C12-Customer from the remote repository
-git fetch se1-origin C12-Customer
+# fetch branch C12-Customer from the remote repository and create local branch
+# git fetch <remote> <rbranch>:<lbranch>
+git fetch se1-origin C12-Customer:C12-Customer
 
-# merge content of fetched branch into current branch without touching existing files
-git merge --allow-unrelated-histories --strategy-option ours FETCH_HEAD
+# set new local branch C12-Customer to track remote branch C12-Customer
+git branch --set-upstream-to=se1-origin/C12-Customer C12-Customer
+
+# show branches
+git branch -avv
 ```
 
-Finally, all tests for *Customers*, *Articles* and *Orders* should show:
+<img src="https://github.com/sgra64/se1.bestellsystem/blob/markup/D12-Datamodel/D1_setup_branches.png?raw=true" alt="drawing" width="800"/>
+
+
+&nbsp;
+
+Content of branch `C12-Customer` can now be merged into branch `D12-Datamodel`
+to complete files missing from that branch:
+
+```sh
+# merge fetched branch into current branch without touching existing files
+git merge --allow-unrelated-histories --strategy-option ours C12-Customer
+```
+
+As result, tests for *Articles*, *Orders* (from branch `D12-Datamodel`)
+and tests for *Customers* (merged from branch `C12-Customer`) should show:
 
 ```sh
 find tests
@@ -148,11 +169,16 @@ source .env/setenv.sh           # source project
 &nbsp;
 
 ## D1: Completing the Datamodel
-  - Datamodel Generation and Completion
-  - Building and Running the Application
-  - Running JUnit Tests
-  - Code Coverage Report
-  - Complete Datamodel Javadoc
+
+- D1.a - [Datamodel Generation and Completion](#d1a-datamodel-generation-and-completion)
+
+- D1.b - [Building and Running the Application](#d1b-building-and-running-the-application)
+
+- D1.c - [Running JUnit Tests](#d1c-running-junit-tests)
+
+- D1.d - [Code Coverage Report](#d1d-code-coverage-report)
+
+- D1.e - [Javadoc for Complete Datamodel](#d1e-javadoc-for-complete-datamodel)
 
 
 &nbsp;
@@ -364,7 +390,7 @@ Run JUnit-Tests also in your IDE.
 
 &nbsp;
 
-### D1.d Code Coverage Reports
+### D1.d Code Coverage Report
 
 <!-- 
 https://stackoverflow.com/questions/17973067/how-to-use-jacoco-exec-report
@@ -658,10 +684,17 @@ Assignment D2 will complete features (methods) in
 to print correct orders.
 
 The assignment is structured in four stages:
-  - [3.a New Articles, Customers and Orders](#3a-new-articles-customers-and-orders)
-  - [3.b *find()* method](#3b-find-method)
-  - [3.c *printOrder()* method](#3c-printorder-method)
-  - [3.d Order Value and Tax Calculations](#3d-order-value-and-tax-calculations)
+
+- D2.a - [New Articles, Customers and Orders](#d2a-new-articles-customers-and-orders)
+
+- D2.b - [*find()* method](#d2b-find-method)
+
+- D2.c - [*printOrder()* method](#d2c-printorder-method)
+
+- D2.d - [Order Value and Tax Calculations](#d2d-order-value-and-tax-calculations)
+
+
+&nbsp;
 
 Find markings `@TODO:` in
 [Application_D1.java](src/application/Application_D1.java).
@@ -956,12 +989,9 @@ public long calculateVAT(final long grossValue, final TAX tax) {
 
 &nbsp;
 
-## 4. Release Preparation
+## Release Preparation
 
-
-&nbsp;
-
-### 4.a Packaging the Application
+### a.) Packaging the Application
 
 The packaged application will be `bin/application-1.0.0-SNAPSHOT.jar`.
 
@@ -982,7 +1012,8 @@ drwxr-xr-x 1      0 May  5 23:17 resources/
 drwxr-xr-x 1      0 May  5 23:17 test-classes/
 ```
 
-### 4.b Running the packaged Application
+
+### b.) Running the packaged Application
 
 Run the packaged jar-file with:
 
@@ -1072,3 +1103,4 @@ done.
 ```
 
 The packaged `.jar`-file: `application-1.0.0-SNAPSHOT.jar` can now be distributed.
+
