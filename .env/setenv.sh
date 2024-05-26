@@ -249,7 +249,7 @@ function cmd() {
                  "$(cmd clean $2); \\"
                  "unset P cmd_shorts CLASSPATH MODULEPATH JDK_JAVAC_OPTIONS JACOCO_AGENT; \\"
                  "unset JDK_JAVADOC_OPTIONS JUNIT_OPTIONS JAVAC_VERSION aliases_present analyze_classes; \\"
-                 "unset -f cmd show make copy javac_version generate_coverage_report; \\"
+                 "unset -f cmd show make copy javac_version coverage_report; \\"
                  "unalias mk build wipe clean; \\"
                  "[ -L libs ] && rm libs"
             ) ;;
@@ -449,7 +449,7 @@ function javac_version() {
 #       --classfiles ./bin/classes/datamodel/TAX.class
 #     )
 # Usage:
-#   generate_coverage_report [html, csv, xml]
+#   coverage_report [html, csv, xml]
 # @param format output format (html is default)
 # @output error message or empty
 function coverage_report() {
