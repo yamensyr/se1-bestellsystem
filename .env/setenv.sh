@@ -4,8 +4,9 @@
 #  - JDK_JAVAC_OPTIONS          ; used by the Java compiler
 #  - JDK_JAVADOC_OPTIONS        ; used by the Javadoc compiler
 #  - JUNIT_OPTIONS              ; used by the JUnit test runner
-#  - JVERSION                   ; target version: 17|19|21 (set externally)
-# \\
+#  - JACOCO_AGENT               ; JVM jacoco agent option for code coverage
+#  - JAVAC_VERSION              ; .class version: 11|17|21 (externally set,
+# \\                            ; requires re-sourcing to be effective)
 # and created project files:
 #  - .classpath, .project       ; files in project directory used by eclipse
 #                               ; and the VSCode Java extension
@@ -35,17 +36,20 @@ declare -gA P=(
     [res]="resources"
     [lib]="libs"
     [target]="bin"
+    [classes]="bin/classes"
+    [test-classes]="bin/test-classes"
     [log]="logs"
     [doc]="docs"
+    [cov]="coverage"
     [env]=".env"
     [url]="https://github.com/sgra64/se1.bestellsystem"
-    [final_jar]="bin/application-1.0.0-SNAPSHOT.jar"
+    [jar]="bin/application-1.0.0-SNAPSHOT.jar"
 )
 
 # list of short commands
 cmd_shorts=("source" "project" "classpath" "cp" "compile" "compile-tests" "resources"
         "jar" "pack" "package" "pack-libs" "test-lib" "run" "run-jar" "run-tests"
-        "javadoc" "clean" "wipe")
+        "coverage" "coverage-report" "javadoc" "clean" "wipe")
 
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -62,8 +66,13 @@ function setup() {
 
     # if 'libs' directory is not in project, attempt to wire it from an
     # alternative path, e.g. where the 'libs'-branch might be checked out
-    for alt in "branches/libs/libs" "branches/libs" "../libs/libs" "../libs"; do
-        [ ! -d ${P[lib]} ] && local libs_linked=$(wire_links $alt ${P[lib]})
+    local lib_paths=(
+        "branches/libs/libs" "branches/libs"
+        "../libs/libs" "../../libs/libs" "../../../libs/libs"
+        "../libs" "../../libs" "../../../libs"
+    )
+    for lpath in "${lib_paths[@]}"; do
+        [ ! -d ${P[lib]} ] && local libs_linked=$(wire_links $lpath ${P[lib]})
     done
     # always adjust P[lib] for symlink (javac does not understand links)
     [ -L libs ] && P[lib]=$(readlink libs)
@@ -72,9 +81,7 @@ function setup() {
     local module_dirs=( $(find ${P[lib]}/* -type d 2>/dev/null) )
     local module_jars=( $(find ${P[lib]}/*/ -name '*.jar' 2>/dev/null) )
     local entries=(
-        ${P[target]}/classes
-        ${P[target]}/test-classes
-        ${P[target]}/resources
+        ${P[classes]} ${P[test-classes]} ${P[target]}/resources
         ${module_jars[@]}
     )
 
@@ -108,7 +115,7 @@ function setup() {
     # set JDK_JAVAC_OPTIONS used by the javac compiler
     if [ -z "$JDK_JAVAC_OPTIONS" ]; then
         # -Xlint:-module supresses warning: module name should not end with digit
-        export JDK_JAVAC_OPTIONS="-Xlint:-module -d ${P[target]}/classes$mp_opt"
+        export JDK_JAVAC_OPTIONS="-Xlint:-module -d ${P[classes]}$mp_opt"
         created+=("JDK_JAVAC_OPTIONS")
     fi
 
@@ -128,9 +135,16 @@ function setup() {
             [[ $(uname -s) =~ ^MINGW.* ]] && echo -n "--details-theme=ascii " || \
                 echo -n "--details-theme=unicode "; \
             [[ "$COLOR" == "off" ]] && echo -n "--disable-ansi-colors "; \
-            echo -n "-cp ${P[target]}/classes -cp ${P[target]}/test-classes"; \
+            echo -n "-cp ${P[classes]} -cp ${P[test-classes]}"; \
         ) \
         && created+=("JUNIT_OPTIONS")
+
+    # set JACOCO_AGENT for recording code coverage events during JUnit tests
+    [ -z "$JACOCO_AGENT" ] && export JACOCO_AGENT=$( \
+            agent=$(echo -n $CLASSPATH | tr "[;:]" "\n" | grep jacocoagent.jar); \
+            echo -n "-javaagent:${agent}=output=file,destfile=${P[cov]}/jacoco.exec"; \
+        ) \
+        && created+=("JACOCO_AGENT")
 
     # report created environment variables
     [ "${created}" ] && echo "setting the project environment" && \
@@ -167,7 +181,7 @@ function setup() {
     # report created aliases and functions
     [ "$aliases_present" = "false" ] && echo " - functions and aliases created:" && \
         echo "    - aliases: mk, build, wipe, clean" && \
-        echo "    - functions: make, show, cmd, copy, jversion" && echo "//"
+        echo "    - functions: make, show, cmd, copy, javac_version, coverage_report" && echo "//"
 
     echo "project environment is set (use 'wipe' to reset)"
 }
@@ -184,50 +198,58 @@ function cmd() {
     case "$1" in
     source|project) cmd=("source ${P[env]}/setenv.sh") ;;
     classpath|cp)   cmd=("echo \$CLASSPATH | tr \"[;:]\" \"\\\n\"") ;;
-    compile)    cmd=("javac $(jversion javac)\$(find ${P[src]} -name '*.java') -d ${P[target]}/classes; \\"
+    compile)    cmd=("javac $(javac_version javac)\$(find ${P[src]} -name '*.java') -d ${P[classes]}; \\"
                 "$(cmd resources $2)"
                 ) ;;
-    compile-tests) cmd=("javac $(jversion javac)\$(find ${P[tests]} -name '*.java') -d ${P[target]}/test-classes; \\"
+    compile-tests) cmd=("javac $(javac_version javac)\$(find ${P[tests]} -name '*.java') -d ${P[test-classes]}; \\"
                 "$(cmd resources $2)"
                 ) ;;
     resources)  cmd=("copy ${P[res]} ${P[target]}/resources")
                 ;;
-    jar|pack|package) cmd=("jar -c -v -f ${P[final_jar]} \\"
+    jar|pack|package) cmd=("jar -c -v -f ${P[jar]} \\"
                 "    -m ${P[res]}/META-INF/MANIFEST.MF \\"
-                "    -C ${P[target]}/classes . ; \\"
-                "jar uvf ${P[final_jar]} -C ${P[target]} resources;")
+                "    -C ${P[classes]} . ; \\"
+                "jar uvf ${P[jar]} -C ${P[target]} resources;")
                 ;;
-    pack-libs)  cmd=("[[ ! -d ${P[target]}/unpacked ]] && mkdir -p ${P[target]}/unpacked && \\"
+    pack-libs)  cmd=("[ ! -d ${P[target]}/unpacked ] && mkdir -p ${P[target]}/unpacked && \\"
                 "  echo inflating libs to ${P[target]}/unpacked && \\"
                 "  (cd ${P[target]}/unpacked; find ../../libs/*/ -type f | xargs -I % jar xf %); \\"
-                "jar uvf ${P[final_jar]} -C ${P[target]}/unpacked org")
+                "jar uvf ${P[jar]} -C ${P[target]}/unpacked org")
                 ;;
     test-lib)   cmd=("mk clean compile-tests; \\"
-                "  jversion manifest > ${P[target]}/manifest.mf; \\"
-                "  jar -c -v -m ${P[target]}/manifest.mf -f ${P[target]}/test-lib.jar -C ${P[target]}/test-classes . ; \\"
+                "  javac_version manifest > ${P[target]}/manifest.mf; \\"
+                "  jar -c -v -m ${P[target]}/manifest.mf -f ${P[target]}/test-lib.jar -C ${P[test-classes]} . ; \\"
                 # "  jar uvf ${P[target]}/test-lib.jar -C ${P[target]} resources; \\"
                 "  rm ${P[target]}/manifest.mf")
                 ;;
     run)        cmd=("java application.Application") ;;
-    run-jar)    cmd=("java -jar ${P[final_jar]}") ;;
+    run-jar)    cmd=("java -jar ${P[jar]}") ;;
     run-tests)  cmd=("java -jar ${P[lib]}/junit-platform-console-standalone-1.9.2.jar \\"
                 "  \$(eval echo \$JUNIT_OPTIONS)"
                 # "-c application.Application_0_always_pass_Tests \\"
                 "--scan-class-path")
                 ;;
+    coverage)  cmd=("java \$(eval echo \$JACOCO_AGENT) \\"
+                "  -jar ${P[lib]}/junit-platform-console-standalone-1.9.2.jar \\"
+                "  \$(eval echo \$JUNIT_OPTIONS) --scan-class-path; \\"
+                "  echo coverage events recorded in: ${P[cov]}/jacoco.exec")
+                ;;
+    coverage-report) cmd=("coverage_report; [ -f ${P[cov]}/index.html ] && \\"
+                "  echo coverage report created in: ${P[cov]}/index.html")
+                ;;
     javadoc)    # append package names containing .java files after $JDK_JAVADOC_OPTIONS
                 cmd=("javadoc -d ${P[doc]} \$(eval echo \$JDK_JAVADOC_OPTIONS) \\"
                 "  \$(cd ${P[src]}; find . -type f | xargs dirname | uniq | cut -c 3-)")
                 ;;
-    clean)  cmd=("rm -rf ${P[target]} ${P[log]} ${P[doc]}")
+    clean)  cmd=("rm -rf ${P[target]} ${P[log]} ${P[doc]} ${P[cov]}")
             ;;
     wipe)   # reset project settings and clear the project directory of generated files
             local wipe_files=( .env/.classpath .classpath .project )
             cmd=("rm -rf ${wipe_files[@]} ; \\"
                  "$(cmd clean $2); \\"
-                 "unset P cmd_shorts CLASSPATH MODULEPATH JDK_JAVAC_OPTIONS; \\"
-                 "unset JDK_JAVADOC_OPTIONS JUNIT_OPTIONS JVERSION aliases_present; \\"
-                 "unset -f cmd show make copy jversion; \\"
+                 "unset P cmd_shorts CLASSPATH MODULEPATH JDK_JAVAC_OPTIONS JACOCO_AGENT; \\"
+                 "unset JDK_JAVADOC_OPTIONS JUNIT_OPTIONS JAVAC_VERSION aliases_present analyze_classes; \\"
+                 "unset -f cmd show make copy javac_version generate_coverage_report; \\"
                  "unalias mk build wipe clean; \\"
                  "[ -L libs ] && rm libs"
             ) ;;
@@ -260,7 +282,7 @@ function show() {
         for short in ${cmd_shorts[@]}; do
             # skip short commands not shown without '--all' option
             [[ "$show_all" = "false" ]] && case "$short" in \
-                package|pack-libs|test-lib|run-jar) continue;
+                coverage|coverage-report|package|pack-libs|test-lib|run-jar) continue;
                 esac
             # list with highlighted short and indented full command
             case "$short" in
@@ -394,23 +416,62 @@ function eclipse_classpath() {
 # - jar tvf file.jar -> META-INF/MANIFEST.MF -> Created-By: 17 (Oracle Corporation)
 # 
 # Java version codes:
-# Java  8(52), Java  9(53), Java 10(54)
+# Java  8(52), Java  9(53), Java 10(54) - do not compile codebase
 # Java 11(55), Java 12(56)
 # Java 13(57), Java 14(58), Java 15(59), Java 16(60)
 # Java 17(61), Java 18(62), Java 19(63), Java 20(64)
-# Java 21(65)
+# Java 21(65), Java 22(66), Java 23(67), Java 24(68)
 # 
 # Usage:
-#   jversion [javac, manifest]
+#   javac_version [javac, manifest]
 # @param output selector
 # @output javac compile version information or empty for current version
-function jversion() {
-    case "$JVERSION" in
-    17|19|21)
-        [ "$1" = "javac" ] && echo "-source $JVERSION -target $JVERSION "
-        [ "$1" = "manifest" ] && echo "Created-By: $JVERSION (Oracle Corporation)"
+function javac_version() {
+    case "$JAVAC_VERSION" in
+    11|17|21)
+        [ "$1" = "javac" ] && echo "-source $JAVAC_VERSION -target $JAVAC_VERSION "
+        [ "$1" = "manifest" ] && echo "Created-By: $JAVAC_VERSION (Oracle Corporation)"
         ;;
     esac
+}
+
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+# Generate code-coverage report based on events recorded in file:
+#   - ${P[cov]}/jacoco.exec
+# 
+# Code coverage report needs definition of source classes to analyse in form:
+#   - analyze_classes=(
+#       --classfiles ./bin/classes/datamodel/Article.class
+#       --classfiles ./bin/classes/datamodel/Customer.class
+#       --classfiles ./bin/classes/datamodel/Currency.class
+#       --classfiles ./bin/classes/datamodel/Order.class
+#       --classfiles ./bin/classes/datamodel/OrderItem.class
+#       --classfiles ./bin/classes/datamodel/TAX.class
+#     )
+# Usage:
+#   generate_coverage_report [html, csv, xml]
+# @param format output format (html is default)
+# @output error message or empty
+function coverage_report() {
+    if [ ! -f "${P[cov]}/jacoco.exec" ]; then
+        echo "--> run coverage agent to create: ${P[cov]}/jacoco.exec"
+    else
+        if [ -z "${analyze_classes}" ]; then
+            echo "--> define variable: \$analyze_classes, e.g. with:"
+            echo "  analyze_classes=("
+            find ${P[classes]} | grep 'datamodel/[A-Z]' | sed -e 's/^/    --classfiles .\//'
+            echo "  )"
+        else
+            local output="--html ${P[cov]}"
+            case "$1" in
+            csv) output="--csv ${P[cov]}/coverage.csv" ;;
+            xml) output="--xml ${P[cov]}/coverage.xml" ;;
+            esac
+            local reporter=$(echo -n $CLASSPATH | tr "[;:]" "\n" | grep jacococli.jar);
+            java -jar "${reporter}" report ${P[cov]}/jacoco.exec \
+                --sourcefiles ${P[src]} $output ${analyze_classes[@]}
+        fi
+    fi
 }
 
 
