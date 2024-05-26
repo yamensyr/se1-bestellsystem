@@ -10,6 +10,7 @@ bin/
 out/
 target/
 *.class
+coverage
 
 # ignore Java packaging files
 *.jar
