@@ -8,6 +8,7 @@
 module se1.bestellsystem {
     opens application;
     exports application;                // export application package to enable Javadoc
+    exports datamodel;
 
     requires org.junit.jupiter.api;     // JUnit-5 test module
     requires java.logging;              // JUL logging module
