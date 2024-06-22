@@ -14,5 +14,5 @@ package application;
  */
 class package_info {
     static final String Author = "sgraupner";
-    static final String Version = "1.0.0-SNAPSHOT-D12-Datamodel";
+    static final String Version = "1.0.0-SNAPSHOT-GX";
 }
